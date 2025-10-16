@@ -1,14 +1,22 @@
-from pages.locators import RegisterPageLocators
+from utils.generators import gen_email, gen_password, gen_name
+from pages.register_page import RegisterPage
+from pages.locators import LoginPageLocators  
 
-def test_success_registration(driver, pages, new_user):
-    pages["register"].open_register()
-    pages["register"].register(new_user["name"], new_user["email"], new_user["password"])
+def test_success_registration_redirects_to_login(driver, base_url):
+    reg = RegisterPage(driver, base_url)
+    reg.open_register()
+    reg.fill_name(gen_name())
+    reg.fill_email(gen_email())
+    reg.fill_password(gen_password(min_len=6))
+    reg.submit()
     
-    pages["login"].wait_login_page_opened()
-    assert "login" in pages["login"].current_url()
+    assert reg.wait_url_contains("login", timeout=10)
 
-def test_error_on_short_password(driver, pages, new_user):
-    pages["register"].open_register()
-    pages["register"].register(new_user["name"], new_user["email"], "12345")
-    assert pages["register"].is_visible(RegisterPageLocators.ERROR_TEXT)
-    
+def test_short_password_shows_validation_error(driver, base_url):
+    reg = RegisterPage(driver, base_url)
+    reg.open_register()
+    reg.fill_name(gen_name())
+    reg.fill_email(gen_email())
+    reg.fill_password("12345")  
+    reg.submit()
+    assert reg.has_password_error()

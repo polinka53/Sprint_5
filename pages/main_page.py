@@ -1,22 +1,25 @@
 from .base_page import BasePage
 from .locators import MainPageLocators
+from selenium.common import TimeoutException
 
 class MainPage(BasePage):
     def open_main(self):
         self.open("/")
 
-    def click_login_account(self):
-        self.click(MainPageLocators.LOGIN_ACCOUNT_BUTTON)
-
-    def go_personal_account(self):
-        self.click(MainPageLocators.PERSONAL_ACCOUNT_LINK)
-
-
     def open_buns_tab(self):
-        self.click(MainPageLocators.BUNS_TAB)
+        self.click(MainPageLocators.TAB_BUNS)
 
     def open_sauces_tab(self):
-        self.click(MainPageLocators.SAUCES_TAB)
+        self.click(MainPageLocators.TAB_SAUCES)
 
     def open_fillings_tab(self):
-        self.click(MainPageLocators.FILLINGS_TAB)
+        self.click(MainPageLocators.TAB_FILLINGS)
+
+    def is_tab_active(self, tab_name: str) -> bool:
+        
+        by = MainPageLocators.ACTIVE_TAB_BY_NAME(tab_name)
+        try:
+            self.wait_visible(by, timeout=5)
+            return True
+        except TimeoutException:
+            return False

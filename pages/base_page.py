@@ -1,85 +1,75 @@
-import os
-from selenium.webdriver.common.by import By
+import time
+from selenium.webdriver import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import (
-    TimeoutException,
-    StaleElementReferenceException,
-    ElementClickInterceptedException,
-)
-
-BASE_URL = os.getenv("BASE_URL", "https://stellarburgers.education-services.ru")
+from selenium.common import ElementClickInterceptedException, StaleElementReferenceException
 
 class BasePage:
-    def __init__(self, driver, timeout=10):
+    def __init__(self, driver, base_url: str):
         self.driver = driver
-        self.wait = WebDriverWait(driver, timeout)
+        self.base_url = base_url.rstrip("/")
 
-    # ---------- Навигация ----------
+    # Навигация
     def open(self, path: str = "/"):
-        if path.startswith("http"):
-            url = path
-        else:
-            url = BASE_URL.rstrip("/") + "/" + path.lstrip("/")
-        self.driver.get(url)
+        path = "/" + path.lstrip("/")
+        self.driver.get(self.base_url + path)
 
-    def current_url(self):
-        return self.driver.current_url
+    # Ожидания/поиск
+    def find(self, locator, timeout: int = 10):
+        return WebDriverWait(self.driver, timeout).until(
+            EC.presence_of_element_located(locator)
+        )
 
-    def wait_url_contains(self, part: str, timeout=10):
-        WebDriverWait(self.driver, timeout).until(EC.url_contains(part))
-        return True
-
-    # ---------- Поиск/ожидания ----------
-    def find(self, locator):
-        return self.driver.find_element(*locator)
-
-    def finds(self, locator):
-        return self.driver.find_elements(*locator)
-
-    def wait_visible(self, locator, timeout=10):
+    def wait_visible(self, locator, timeout: int = 10):
         return WebDriverWait(self.driver, timeout).until(
             EC.visibility_of_element_located(locator)
         )
 
-    def wait_clickable(self, locator, timeout=10):
+    def wait_clickable(self, locator, timeout: int = 10):
         return WebDriverWait(self.driver, timeout).until(
             EC.element_to_be_clickable(locator)
         )
 
-    # ---------- Действия ----------
-    def type(self, locator, text):
+    def click(self, locator, timeout: int = 10):
+        """Аккуратный клик: прокрутка → наведение → клик; с повтором при перехвате."""
+        end = time.time() + timeout
+        last_err = None
+        while True:
+            try:
+                el = self.wait_clickable(locator, timeout=max(1, int(end - time.time())))
+                self.scroll_into_view(locator)
+                ActionChains(self.driver).move_to_element(el).pause(0.05).click(el).perform()
+                return
+            except (ElementClickInterceptedException, StaleElementReferenceException) as e:
+                last_err = e
+                if time.time() >= end:
+                    raise last_err
+                time.sleep(0.2)
+
+    def type(self, locator, text: str):
         el = self.wait_visible(locator)
         el.clear()
         el.send_keys(text)
 
-    def click(self, locator):
-        """
-        Надёжный клик:
-        1) ждём кликабельности;
-        2) пробуем обычный click();
-        3) при перехвате/устаревании пробуем ещё раз;
-        4) как fallback — JS click.
-        """
-        last_exc = None
-        for _ in range(3):
-            try:
-                el = self.wait_clickable(locator)
-                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'})", el)
-                el.click()
-                return
-            except (StaleElementReferenceException, ElementClickInterceptedException) as e:
-                last_exc = e
-        # fallback
+    # Вспомогательные
+    def get_attr(self, locator, attribute: str):
         el = self.wait_visible(locator)
-        self.driver.execute_script("arguments[0].click();", el)
-        if last_exc:
-            
-            _ = str(last_exc)
+        return el.get_attribute(attribute)
 
-    def is_visible(self, locator, timeout=5):
+    def is_visible(self, locator, timeout: int = 10) -> bool:
         try:
-            self.wait_visible(locator, timeout=timeout)
+            self.wait_visible(locator, timeout)
             return True
-        except TimeoutException:
+        except Exception:
+            return False
+
+    def scroll_into_view(self, locator):
+        el = self.find(locator)
+        self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+
+    def wait_url_contains(self, substring: str, timeout: int = 10) -> bool:
+        try:
+            WebDriverWait(self.driver, timeout).until(EC.url_contains(substring))
+            return True
+        except Exception:
             return False
