@@ -1,18 +1,25 @@
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from pages.main_page import MainPage
 from pages.login_page import LoginPage
 from pages.account_page import AccountPage
 
-import pytest
-@pytest.mark.needs_auth
 
-def test_logout_shows_login_page(driver, base_url, registered_user):
-    login = LoginPage(driver, base_url)
-    login.open_login()
-    login.login(registered_user["email"], registered_user["password"])
-
-    account = AccountPage(driver, base_url)
-    account.open_account()
-    assert account.is_profile_visible()
-
-    assert account.logout()
+def test_logout_from_account(driver, registered_user):
     
-    assert login.is_login_visible()
+    main = MainPage(driver)
+    main.open_main()
+    main.go_account_from_header()
+
+    login = LoginPage(driver)
+    login.fill_email(registered_user["email"])
+    login.fill_password(registered_user["password"])
+    login.submit()
+
+    main.go_account_from_header()
+    acc = AccountPage(driver)
+    assert acc.is_profile_visible()
+
+    
+    acc.logout()
+    WebDriverWait(driver, 10).until(EC.url_contains("/login"))

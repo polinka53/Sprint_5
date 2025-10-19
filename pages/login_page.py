@@ -1,20 +1,16 @@
 from .base_page import BasePage
-from .locators import LoginPageLocators, RegisterPageLocators
+from .locators import LoginPageLocators
+
 
 class LoginPage(BasePage):
     def open_login(self):
-        self.open("/login")
+        self.driver.get("https://stellarburgers.education-services.ru/login")
 
-    def open_forgot_password(self):
-        self.open("/forgot-password")
+    def fill_email(self, email: str):
+        self.fill(LoginPageLocators.EMAIL_INPUT, email)
 
-    def is_login_visible(self) -> bool:
-        return self.is_visible(LoginPageLocators.LOGIN_HEADER)
+    def fill_password(self, password: str):
+        self.fill(LoginPageLocators.PASSWORD_INPUT, password)
 
-    def login(self, email: str, password: str):
-        """Авторизация пользователя через форму входа."""
-        self.type(RegisterPageLocators.EMAIL_INPUT, email)
-        self.type(RegisterPageLocators.PASSWORD_INPUT, password)
-        
-        from selenium.webdriver.common.by import By
-        self.click((By.XPATH, "//button[text()='Войти']"))
+    def submit(self):
+        self.click(LoginPageLocators.SUBMIT_BUTTON)

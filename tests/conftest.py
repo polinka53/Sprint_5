@@ -1,91 +1,73 @@
-import os
 import pytest
+import random
+import string
+
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from dotenv import load_dotenv
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 from pages.register_page import RegisterPage
-from utils.generators import gen_email, gen_password, gen_name
 
-load_dotenv()
 
-BASE_URL = os.getenv("BASE_URL", "https://stellarburgers.education-services.ru")
+BASE_URL = "https://stellarburgers.education-services.ru/"
+
+
+def _rand(n=3) -> str:
+    return "".join(random.choices(string.digits, k=n))
 
 
 @pytest.fixture
 def driver():
-    """Инициализация браузера Chrome."""
-    options = ChromeOptions()
-    if os.getenv("HEADLESS", "0") == "1":
-        options.add_argument("--headless=new")
+    """Старт/стоп браузера на каждый тест."""
+    options = Options()
     options.add_argument("--window-size=1280,900")
-    drv = webdriver.Chrome(options=options)
+    options.add_argument("--disable-notifications")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-extensions")
+    # options.add_argument("--headless=new")  # если захочешь гонять без UI
+
+    drv = webdriver.Chrome(service=Service(), options=options)
+    drv.implicitly_wait(5)
     yield drv
     drv.quit()
 
 
 @pytest.fixture
 def base_url():
-    """Базовый URL приложения."""
     return BASE_URL
 
 
 @pytest.fixture
-def registered_user(driver, base_url):
-    """Создаёт нового пользователя через UI и возвращает его данные."""
-    page = RegisterPage(driver, base_url)
-    page.open_register()
-
-    name = gen_name()
-    email = gen_email()
-    password = gen_password()
-
-    page.fill_name(name)
-    page.fill_email(email)
-    page.fill_password(password)
-    page.submit()
-
-    # Возвращаем данные для логина
-    return {"name": name, "email": email, "password": password}
-import pytest
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-def _auth_is_working(driver, base_url, timeout=6) -> bool:
-    """Пробуем залогиниться заведомо фейковыми данными и ждём РЕАКЦИИ UI.
-    Если страница совсем не реагирует (нет ошибки и нет перехода) — считаем, что логин «лежит».
+def registered_user(driver):
     """
-    try:
-        driver.get(base_url + "/login")
-        WebDriverWait(driver, timeout).until(
-            EC.visibility_of_element_located((By.XPATH, "//h2[text()='Вход']"))
-        )
+    Готовит валидного пользователя через UI и возвращает его креды.
+    После регистрации остаёмся на /login — далее тесты сами логинятся.
+    """
+    name = "Polina"
+    email = f"polina_pavl_1999_{_rand()}@yandex.ru"
+    password = "123456"
 
-        email = driver.find_element(By.XPATH, "//label[text()='Email']/following-sibling::input")
-        pwd   = driver.find_element(By.XPATH, "//label[text()='Пароль']/following-sibling::input")
-        btn   = driver.find_element(By.XPATH, "//button[text()='Войти']")
+    reg = RegisterPage(driver)
+    reg.open_register()         
+    reg.fill_name(name)
+    reg.fill_email(email)
+    reg.fill_password(password)
+    reg.submit()
 
-        email.clear(); email.send_keys("fake_user@example.test")
-        pwd.clear();   pwd.send_keys("1234567")
-        btn.click()
+    WebDriverWait(driver, 10).until(EC.url_contains("/login"))
 
-        
-        WebDriverWait(driver, timeout).until(
-            EC.any_of(
-                EC.url_contains("/account"),
-                EC.visibility_of_element_located(
-                    (By.XPATH, "//*[contains(., 'Некорректн') or contains(., 'неверн') or contains(., 'ошибк')]")
-                )
-            )
-        )
-        return True
-    except Exception:
-        return False
+    return {"name": name, "email": email, "password": password}
 
-@pytest.fixture(autouse=True)
-def auth_guard(request, driver, base_url):
-    """Если тест помечен needs_auth и авторизация на стенде не отвечает — xfail."""
-    if request.node.get_closest_marker("needs_auth"):
-        if not _auth_is_working(driver, base_url):
-            pytest.xfail("Учебный стенд: авторизация временно не отвечает — помечаем тест XFAIL")
+
+@pytest.fixture
+def unique_user():
+    """Если где-то нужен просто уникальный юзер без предварительной регистрации."""
+    return {
+        "name": "Polina",
+        "email": f"polina_pavl_1999_{_rand()}@yandex.ru",
+        "password": "123456",
+    }

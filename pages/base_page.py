@@ -1,75 +1,58 @@
-import time
-from selenium.webdriver import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common import ElementClickInterceptedException, StaleElementReferenceException
+from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
+
+DEFAULT_TIMEOUT = 10
+
 
 class BasePage:
-    def __init__(self, driver, base_url: str):
+    def __init__(self, driver):
         self.driver = driver
-        self.base_url = base_url.rstrip("/")
 
-    # Навигация
-    def open(self, path: str = "/"):
-        path = "/" + path.lstrip("/")
-        self.driver.get(self.base_url + path)
+    
+    def open(self, url: str):
+        if url.startswith("http"):
+            self.driver.get(url)
+        else:
+            
+            self.driver.get(self.driver.current_url.split("/", 3)[0] + "//" + self.driver.current_url.split("/", 3)[2] + url)
 
-    # Ожидания/поиск
-    def find(self, locator, timeout: int = 10):
-        return WebDriverWait(self.driver, timeout).until(
-            EC.presence_of_element_located(locator)
-        )
+    def wait_visible(self, locator, timeout: int = DEFAULT_TIMEOUT):
+        return WebDriverWait(self.driver, timeout).until(EC.visibility_of_element_located(locator))
 
-    def wait_visible(self, locator, timeout: int = 10):
-        return WebDriverWait(self.driver, timeout).until(
-            EC.visibility_of_element_located(locator)
-        )
+    def wait_clickable(self, locator, timeout: int = DEFAULT_TIMEOUT):
+        return WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable(locator))
 
-    def wait_clickable(self, locator, timeout: int = 10):
-        return WebDriverWait(self.driver, timeout).until(
-            EC.element_to_be_clickable(locator)
-        )
+    def scroll_into_view(self, locator):
+        el = self.driver.find_element(*locator)
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
+        return el
 
-    def click(self, locator, timeout: int = 10):
-        """Аккуратный клик: прокрутка → наведение → клик; с повтором при перехвате."""
-        end = time.time() + timeout
-        last_err = None
-        while True:
-            try:
-                el = self.wait_clickable(locator, timeout=max(1, int(end - time.time())))
-                self.scroll_into_view(locator)
-                ActionChains(self.driver).move_to_element(el).pause(0.05).click(el).perform()
-                return
-            except (ElementClickInterceptedException, StaleElementReferenceException) as e:
-                last_err = e
-                if time.time() >= end:
-                    raise last_err
-                time.sleep(0.2)
+    def click(self, locator, timeout: int = DEFAULT_TIMEOUT):
+        
+        try:
+            self.wait_clickable(locator, timeout).click()
+            return
+        except ElementClickInterceptedException:
+            pass  
 
-    def type(self, locator, text: str):
-        el = self.wait_visible(locator)
-        el.clear()
-        el.send_keys(text)
+        el = self.scroll_into_view(locator)
+        try:
+            WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable(locator))
+            el.click()
+        except ElementClickInterceptedException:
+            
+            WebDriverWait(self.driver, 1).until(lambda d: True)
+            el.click()
 
-    # Вспомогательные
-    def get_attr(self, locator, attribute: str):
-        el = self.wait_visible(locator)
-        return el.get_attribute(attribute)
+    def fill(self, locator, text: str):
+        field = self.wait_visible(locator)
+        field.clear()
+        field.send_keys(text)
 
-    def is_visible(self, locator, timeout: int = 10) -> bool:
+    def is_visible(self, locator, timeout: int = DEFAULT_TIMEOUT) -> bool:
         try:
             self.wait_visible(locator, timeout)
             return True
-        except Exception:
-            return False
-
-    def scroll_into_view(self, locator):
-        el = self.find(locator)
-        self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-
-    def wait_url_contains(self, substring: str, timeout: int = 10) -> bool:
-        try:
-            WebDriverWait(self.driver, timeout).until(EC.url_contains(substring))
-            return True
-        except Exception:
+        except TimeoutException:
             return False

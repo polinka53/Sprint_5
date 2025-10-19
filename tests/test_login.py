@@ -1,29 +1,20 @@
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from pages.main_page import MainPage
 from pages.login_page import LoginPage
-from pages.register_page import RegisterPage
-from pages.account_page import AccountPage
-
-import pytest
-@pytest.mark.needs_auth
-def test_login_from_register_form(driver, base_url, registered_user):
-    reg = RegisterPage(driver, base_url)
-    reg.open_register()
-
-    login = LoginPage(driver, base_url)
-    login.open_login()
-    login.login(registered_user["email"], registered_user["password"])
-
-    account = AccountPage(driver, base_url)
-    account.open_account()
-    assert account.is_profile_visible()
 
 
-@pytest.mark.xfail(reason="Учебный стенд: авторизация временно не отвечает", strict=False)
-def test_login_from_forgot_password(driver, base_url, registered_user):
-    login = LoginPage(driver, base_url)
-    login.open_forgot_password()
-    login.open_login()
-    login.login(registered_user["email"], registered_user["password"])
+def test_login_from_main_button(driver, registered_user):
+    main = MainPage(driver)
+    main.open_main()
+    main.click_login_on_main()
 
-    account = AccountPage(driver, base_url)
-    account.open_account()
-    assert account.is_profile_visible()
+    login = LoginPage(driver)
+    login.fill_email(registered_user["email"])
+    login.fill_password(registered_user["password"])
+    login.submit()
+
+   
+    WebDriverWait(driver, 10).until_not(EC.url_contains("/login"))
+    
+    assert driver.current_url.rstrip("/").endswith("stellarburgers.education-services.ru")
