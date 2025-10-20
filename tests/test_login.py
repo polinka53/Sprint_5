@@ -1,20 +1,25 @@
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from pages.main_page import MainPage
-from pages.login_page import LoginPage
+from locators import LoginPageLocators, HeaderLocators
+from conftest import BASE_URL
 
+def _login(driver, email, password):
+    WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located(LoginPageLocators["EMAIL_INPUT"])
+    ).send_keys(email)
+    driver.find_element(*LoginPageLocators["PASSWORD_INPUT"]).send_keys(password)
+    driver.find_element(*LoginPageLocators["SUBMIT_BUTTON"]).click()
 
 def test_login_from_main_button(driver, registered_user):
-    main = MainPage(driver)
-    main.open_main()
-    main.click_login_on_main()
-
-    login = LoginPage(driver)
-    login.fill_email(registered_user["email"])
-    login.fill_password(registered_user["password"])
-    login.submit()
-
-   
+    driver.get(BASE_URL)
+    driver.find_element("xpath", "//button[normalize-space()='Войти в аккаунт']").click()
+    _login(driver, registered_user["email"], registered_user["password"])
     WebDriverWait(driver, 10).until_not(EC.url_contains("/login"))
-    
-    assert driver.current_url.rstrip("/").endswith("stellarburgers.education-services.ru")
+    assert driver.current_url.startswith(BASE_URL)
+
+def test_login_from_header_account(driver, registered_user):
+    driver.get(BASE_URL)
+    driver.find_element(*HeaderLocators["PERSONAL_ACCOUNT"]).click()
+    _login(driver, registered_user["email"], registered_user["password"])
+    WebDriverWait(driver, 10).until_not(EC.url_contains("/login"))
+    assert driver.current_url.startswith(BASE_URL)

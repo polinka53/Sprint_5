@@ -1,18 +1,16 @@
-from pages.main_page import MainPage
-from pages.login_page import LoginPage
-from pages.account_page import AccountPage
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from locators import HeaderLocators, LoginPageLocators
+from conftest import BASE_URL
 
 def test_go_to_personal_account_opens_profile(driver, registered_user):
-    main = MainPage(driver)
-    main.open_main()
-    main.go_account_from_header()
+    driver.get(BASE_URL)
+    driver.find_element(*HeaderLocators["PERSONAL_ACCOUNT"]).click()
 
-    login = LoginPage(driver)
-    login.fill_email(registered_user["email"])
-    login.fill_password(registered_user["password"])
-    login.submit()
+    driver.find_element(*LoginPageLocators["EMAIL_INPUT"]).send_keys(registered_user["email"])
+    driver.find_element(*LoginPageLocators["PASSWORD_INPUT"]).send_keys(registered_user["password"])
+    driver.find_element(*LoginPageLocators["SUBMIT_BUTTON"]).click()
 
-    main.go_account_from_header()
-
-    acc = AccountPage(driver)
-    assert acc.is_profile_visible()
+    driver.find_element(*HeaderLocators["PERSONAL_ACCOUNT"]).click()
+    WebDriverWait(driver, 10).until(EC.url_contains("/account/profile"))
+    assert "/account/profile" in driver.current_url
